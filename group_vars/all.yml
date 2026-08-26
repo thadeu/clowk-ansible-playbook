@@ -18,7 +18,6 @@ admin_ssh_public_keys: []
 
 # Login accounts with passwordless sudo and Docker access.
 admin_users:
-  - debian
   - voodu
 
 # The port that sshd listens on. The firewall role and the fail2ban role

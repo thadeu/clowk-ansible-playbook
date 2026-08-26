@@ -10,6 +10,24 @@
         timeout: 300
       tags: always
 
+    - name: Install python3-apt so the apt module also works in check mode
+      ansible.builtin.raw: |
+        set -e
+        if python3 -c 'import apt, apt_pkg' 2>/dev/null; then
+          echo PRESENT
+        else
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -qq
+          apt-get install -y -qq python3-apt
+          echo INSTALLED
+        fi
+      register: common_python_apt
+      changed_when: "'INSTALLED' in common_python_apt.stdout"
+      # The apt module needs this package before it can report anything, so
+      # the task runs for real even during a dry run.
+      check_mode: false
+      tags: always
+
     - name: Stop when the operating system is not Debian or Ubuntu
       ansible.builtin.assert:
         that:

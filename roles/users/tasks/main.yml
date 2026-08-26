@@ -62,10 +62,25 @@
   loop: "{{ admin_users }}"
   when: admin_passwordless_sudo | bool
 
+- name: Read the passwd database
+  ansible.builtin.getent:
+    database: passwd
+
 - name: Install the authorized SSH keys
   ansible.posix.authorized_key:
     user: "{{ item }}"
     key: "{{ admin_authorized_keys | join('\n') }}"
     exclusive: "{{ admin_ssh_keys_exclusive | bool }}"
     state: present
+    # A dry run reaches this task before the user exists, and the module
+    # then cannot read the home directory out of the passwd database. With
+    # an explicit path it reports the change instead of failing. The path
+    # below is the real home of a user that exists, and the home that
+    # useradd is going to create for one that does not.
+    path: "{{ admin_user_home }}/.ssh/authorized_keys"
+  vars:
+    admin_user_home: >-
+      {{ ansible_facts.getent_passwd[item][4]
+         if item in ansible_facts.getent_passwd
+         else '/home/' ~ item }}
   loop: "{{ admin_users }}"

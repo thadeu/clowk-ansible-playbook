@@ -25,7 +25,7 @@ The workstation needs **Docker** and **just** only.
 
 ```bash
 just setup                          # build the control-node image, once
-just new server01 203.0.113.10      # add the VM, ping it, dry run
+just new server01 203.0.113.10      # add the VM, ping it, show the plan
 just bootstrap server01             # run the playbook and show the result
 ```
 
@@ -264,10 +264,16 @@ $ just --list play
 | Command | Result |
 | --- | --- |
 | `just setup` | Build the control-node image |
-| `just new server01 203.0.113.10` | Add the VM, ping it, then dry run |
+| `just new server01 203.0.113.10` | Add the VM, ping it, then show the plan |
 | `just new server02 203.0.113.11 ubuntu` | The same with another login user |
 | `just bootstrap server01` | Run the playbook on one host, then verify |
 | `just test` | Syntax, ansible-lint and template rendering |
+
+`just new` shows the settings and the task list, not a dry run. On a fresh VM
+a dry run cannot work: nearly every role installs a package that the next task
+needs, and check mode only pretends to install it, so the run stops on the
+first one. Use `just play check` on a server that this playbook already
+provisioned, where the packages are in place and the output is real.
 
 ### Ansible flags go straight through
 
@@ -377,7 +383,7 @@ Docker is the supported path. If you prefer a local Ansible:
 python3 -m venv .venv && source .venv/bin/activate
 pip install ansible-core ansible-lint
 ansible-galaxy collection install -r requirements.yml
-ansible-playbook playbook.yml --check --diff
+ansible-playbook playbook.yml --diff
 ```
 
 ## 4. Configuration reference

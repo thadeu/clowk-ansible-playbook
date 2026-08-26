@@ -9,6 +9,8 @@
 # The commands live in .just/, one file for each area.
 # ---------------------------------------------------------------------------
 
+PLAYBOOK := env('PLAYBOOK', 'playbook.yml')
+
 # Manage the control-node container image
 mod image '.just/image.just'
 
@@ -62,10 +64,19 @@ new name ip user='debian' *args:
         exit 1
     fi
     echo
-    echo ">> Dry run. Nothing is changed on the server."
-    just play check --limit {{ name }} {{ args }}
+    echo ">> The settings that {{ name }} is going to get."
+    just play raw ansible-inventory --host {{ name }} --yaml
     echo
-    echo "  Review the output above, then run:"
+    echo ">> The tasks that are going to run. Nothing is changed yet."
+    just play raw ansible-playbook {{ PLAYBOOK }} --list-tasks --limit {{ name }}
+    echo
+    echo "  There is no dry run here on purpose. On a new VM every role"
+    echo "  installs a package that the next task needs, and check mode only"
+    echo "  pretends to install it, so the run stops on the first one."
+    echo "  Use \"just play check\" later, on a server this playbook already"
+    echo "  provisioned. There it works and it is worth reading."
+    echo
+    echo "  Read ssh_port and admin_users above, then run:"
     echo "    just bootstrap {{ name }} {{ args }}"
 
 [doc('Run the playbook against one host and show the result')]
