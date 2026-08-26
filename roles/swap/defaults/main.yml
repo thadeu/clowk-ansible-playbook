@@ -1,0 +1,6 @@
+---
+swap_enabled: true
+swap_file: /swapfile
+swap_size: 2G
+swap_swappiness: "10"
+swap_vfs_cache_pressure: "50"

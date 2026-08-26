@@ -1,0 +1,50 @@
+---
+- name: Bootstrap and harden a new cloud VM
+  hosts: servers
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Wait until the host accepts an SSH connection
+      ansible.builtin.wait_for_connection:
+        timeout: 300
+      tags: always
+
+    - name: Stop when the operating system is not Debian or Ubuntu
+      ansible.builtin.assert:
+        that:
+          - ansible_os_family == "Debian"
+        quiet: true
+      tags: always
+
+  roles:
+    - role: common
+      tags: [common]
+
+    - role: logging
+      tags: [logging]
+      when: logging_enabled | bool
+
+    - role: users
+      tags: [users]
+
+    - role: swap
+      tags: [swap]
+
+    # The firewall runs before the ssh role so that a new ssh_port
+    # is already open when sshd restarts.
+    - role: firewall
+      tags: [firewall]
+
+    - role: fail2ban
+      tags: [fail2ban]
+
+    - role: ssh
+      tags: [ssh]
+
+    - role: docker
+      tags: [docker]
+
+    - role: tools
+      tags: [tools]
+      when: tools_enabled | bool

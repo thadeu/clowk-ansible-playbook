@@ -1,0 +1,70 @@
+---
+- name: Do not lock the connection user out
+  ansible.builtin.assert:
+    that:
+      - ssh_permit_root_login != 'no' or (ansible_user | default('root')) != 'root' or admin_users | length > 0
+    fail_msg: >-
+      You connect as root, PermitRootLogin becomes "no", and admin_users
+      is empty. After the restart nobody can log in.
+      Add an account to admin_users, or set ssh_permit_root_login to
+      "prohibit-password".
+    quiet: true
+
+- name: Make sure the sshd drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Make sure sshd_config reads the drop-in directory
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    line: "Include /etc/ssh/sshd_config.d/*.conf"
+    insertbefore: BOF
+    firstmatch: true
+    state: present
+    validate: "/usr/sbin/sshd -t -f %s"
+  notify: Restart SSH
+
+- name: Write the sshd hardening drop-in
+  ansible.builtin.template:
+    src: 99-hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/99-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+    validate: "/usr/sbin/sshd -t -f %s"
+  notify: Restart SSH
+
+- name: Start sshd on boot
+  ansible.builtin.service:
+    name: "{{ ssh_service_name }}"
+    enabled: true
+
+# The systemd module cannot report the enabled state without acting on it.
+- name: Read the state of ssh.socket  # noqa: command-instead-of-module
+  ansible.builtin.command: systemctl is-enabled ssh.socket
+  register: ssh_socket_state
+  changed_when: false
+  failed_when: false
+
+# Ubuntu 22.10 and later start sshd from a socket unit. That unit holds
+# the port, so sshd ignores the Port keyword until the socket is off.
+- name: Replace socket activation with the classic sshd service
+  when:
+    - ssh_port | int != 22
+    - ssh_socket_state.stdout | trim == "enabled"
+  block:
+    - name: Stop and disable ssh.socket
+      ansible.builtin.systemd:
+        name: ssh.socket
+        enabled: false
+        state: stopped
+
+    - name: Start sshd directly
+      ansible.builtin.systemd:
+        name: "{{ ssh_service_name }}"
+        enabled: true
+        state: started

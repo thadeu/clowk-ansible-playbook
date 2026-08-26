@@ -1,0 +1,69 @@
+---
+# --syntax-check never opens a Jinja template. This play renders every
+# template with the role defaults and fails on a broken expression.
+#
+#   just lint render
+#
+- name: Render every template with the role defaults
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  vars_files:
+    - ../roles/ssh/defaults/main.yml
+    - ../roles/fail2ban/defaults/main.yml
+    - ../roles/docker/defaults/main.yml
+  vars:
+    ansible_managed: "Ansible managed"
+    admin_users:
+      - debian
+
+  tasks:
+    - name: Render the sshd drop-in with the defaults
+      ansible.builtin.set_fact:
+        sshd_default: "{{ lookup('template', '../roles/ssh/templates/99-hardening.conf.j2') }}"
+
+    - name: Render the sshd drop-in with a changed port and AllowUsers
+      ansible.builtin.set_fact:
+        sshd_custom: "{{ lookup('template', '../roles/ssh/templates/99-hardening.conf.j2') }}"
+      vars:
+        ssh_port: 2222
+        ssh_allow_users:
+          - debian
+          - deploy
+
+    - name: Render the fail2ban jail
+      ansible.builtin.set_fact:
+        jail: "{{ lookup('template', '../roles/fail2ban/templates/sshd.local.j2') }}"
+
+    - name: Render the Docker daemon configuration
+      ansible.builtin.set_fact:
+        daemon: "{{ lookup('template', '../roles/docker/templates/daemon.json.j2') | from_json }}"
+
+    - name: Check the rendered sshd drop-in
+      ansible.builtin.assert:
+        that:
+          - "'Port 22' in sshd_default"
+          - "'PermitRootLogin no' in sshd_default"
+          - "'AllowUsers' not in sshd_default"
+          - "'Port 2222' in sshd_custom"
+          - "'AllowUsers debian deploy' in sshd_custom"
+        fail_msg: "The sshd template does not render as expected."
+        success_msg: "sshd drop-in renders correctly, with and without AllowUsers."
+
+    - name: Check the rendered fail2ban jail
+      ansible.builtin.assert:
+        that:
+          - "'[sshd]' in jail"
+          - "'banaction = ufw' in jail"
+          - "'port = 22' in jail"
+        fail_msg: "The fail2ban template does not render as expected."
+        success_msg: "fail2ban jail renders correctly."
+
+    - name: Check that daemon.json is valid JSON with a log limit
+      ansible.builtin.assert:
+        that:
+          - daemon['log-driver'] == 'json-file'
+          - daemon['log-opts']['max-size'] is defined
+          - daemon['log-opts']['max-file'] is defined
+        fail_msg: "daemon.json.j2 does not render valid JSON."
+        success_msg: "daemon.json renders as valid JSON with a log limit."

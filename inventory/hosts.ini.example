@@ -1,0 +1,17 @@
+# Copy this file to hosts.ini and add your VMs. hosts.ini is git-ignored,
+# so real hostnames never reach the repository.
+#
+#   cp inventory/hosts.ini.example inventory/hosts.ini
+#   just inv add server01 203.0.113.10
+#
+#   ansible_host  public IPv4 or DNS name of the instance
+#   ansible_user  the image default user: "debian" on OVH Debian images,
+#                 "ubuntu" on OVH Ubuntu images, "root" on some images
+
+[servers]
+# server01 ansible_host=203.0.113.10 ansible_user=debian
+# server02 ansible_host=203.0.113.11 ansible_user=ubuntu
+
+[servers:vars]
+ansible_python_interpreter=/usr/bin/python3
+; ansible_ssh_private_key_file=~/.ssh/id_ed25519

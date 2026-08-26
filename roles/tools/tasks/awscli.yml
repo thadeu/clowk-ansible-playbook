@@ -1,0 +1,83 @@
+---
+- name: Read the aws-cli version that apt offers
+  ansible.builtin.command: apt-cache policy awscli
+  register: tools_awscli_policy
+  changed_when: false
+  check_mode: false
+
+- name: Work out which aws-cli install method to use
+  ansible.builtin.set_fact:
+    tools_awscli_candidate: >-
+      {{ tools_awscli_policy.stdout
+         | regex_search('Candidate:\s*(\S+)', '\1')
+         | first | default('none') }}
+
+- name: Choose apt or the official installer
+  ansible.builtin.set_fact:
+    tools_awscli_use_apt: >-
+      {{ tools_awscli_method == 'apt'
+         or (tools_awscli_method == 'auto'
+             and tools_awscli_candidate.startswith('2.')) }}
+
+- name: Report the aws-cli install method
+  ansible.builtin.debug:
+    msg: >-
+      aws-cli: apt offers {{ tools_awscli_candidate }},
+      using {{ 'apt' if tools_awscli_use_apt | bool else 'the official v2 installer' }}.
+
+- name: Install aws-cli from apt
+  ansible.builtin.apt:
+    name: awscli
+    state: present
+    lock_timeout: 300
+  when: tools_awscli_use_apt | bool
+
+- name: Install aws-cli v2 from the official installer
+  when: not tools_awscli_use_apt | bool
+  block:
+    # The common role installs unzip too, but this role has to stand on its
+    # own so that "just play role tools" works against a fresh host.
+    - name: Install unzip for the aws-cli archive
+      ansible.builtin.apt:
+        name: unzip
+        state: present
+        lock_timeout: 300
+
+    - name: Look for an existing aws-cli
+      ansible.builtin.stat:
+        path: /usr/local/bin/aws
+      register: tools_awscli_bin
+
+    - name: Download and install aws-cli v2
+      when: not tools_awscli_bin.stat.exists or tools_awscli_update | bool
+      block:
+        - name: Create a temporary directory for the installer
+          ansible.builtin.tempfile:
+            state: directory
+            suffix: awscli
+          register: tools_awscli_tmp
+
+        - name: Unpack the aws-cli installer
+          ansible.builtin.unarchive:
+            # ansible_architecture is x86_64 or aarch64, which is exactly how
+            # AWS names the archives. No mapping needed.
+            src: >-
+              https://awscli.amazonaws.com/awscli-exe-linux-{{ ansible_architecture }}{{
+                ('-' + tools_awscli_version) if tools_awscli_version | length > 0 else ''
+              }}.zip
+            dest: "{{ tools_awscli_tmp.path }}"
+            remote_src: true
+
+        - name: Run the aws-cli installer
+          ansible.builtin.command:
+            cmd: >-
+              {{ tools_awscli_tmp.path }}/aws/install
+              {{ '--update' if tools_awscli_bin.stat.exists else '' }}
+          changed_when: true
+
+      always:
+        - name: Remove the installer directory
+          ansible.builtin.file:
+            path: "{{ tools_awscli_tmp.path }}"
+            state: absent
+          when: tools_awscli_tmp.path is defined

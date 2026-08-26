@@ -1,0 +1,36 @@
+---
+# Accounts that join the "docker" group.
+docker_users: "{{ admin_users | default([]) }}"
+
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+
+# The template renders this dictionary into /etc/docker/daemon.json.
+# The log limits stop one container from filling the disk.
+docker_daemon_options:
+  log-driver: json-file
+  log-opts:
+    max-size: "900m"
+    max-file: "5"
+
+# The apt keyring and the source file that this role owns.
+docker_keyring: /etc/apt/keyrings/docker.asc
+docker_sources_file: /etc/apt/sources.list.d/docker.sources
+
+docker_apt_arch: "{{ ansible_architecture | replace('x86_64', 'amd64') | replace('aarch64', 'arm64') }}"
+
+# Keyrings that an older Docker install may have left. Any of these that is
+# not docker_keyring is removed.
+docker_stale_keyrings:
+  - /etc/apt/keyrings/docker.gpg
+  - /usr/share/keyrings/docker-archive-keyring.gpg
+  - /usr/share/keyrings/docker.gpg
+
+# Remove Docker apt sources and keyrings left by get.docker.com, a manual
+# install, or an older run of this role. Without this, apt stops with
+# "Conflicting values set for option Signed-By".
+docker_clean_conflicting_sources: true

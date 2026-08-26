@@ -1,0 +1,36 @@
+---
+logging_enabled: true
+
+# ---------------------------------------------------------------------------
+# logrotate
+#
+# Every Debian config in /etc/logrotate.d is "weekly" + "rotate 4" and sets no
+# size limit, so a chatty day can fill the disk long before the weekly run.
+# These go in /etc/logrotate.conf, where they apply to every log file that
+# does not set its own value. No package config sets maxsize, so the ceiling
+# reaches all of them, including files added later.
+# ---------------------------------------------------------------------------
+
+# Rotate as soon as a file passes this size, without waiting for the weekly
+# run. logrotate.timer fires once a day, so this is checked daily.
+logging_logrotate_maxsize: 50M
+
+# Compress the rotated files. delaycompress keeps the newest rotation plain,
+# so a service still writing to it does not break.
+logging_logrotate_compress: true
+
+# ---------------------------------------------------------------------------
+# journald
+#
+# The compiled default is 10% of the filesystem, capped at 4G. That is the
+# largest single log consumer on a normal VM.
+# ---------------------------------------------------------------------------
+logging_journald_max_use: 200M
+logging_journald_keep_free: 1G
+logging_journald_max_file_size: 50M
+logging_journald_max_retention: 1month
+
+# rsyslog writes /var/log/syslog from the journal. With both running, every
+# message is stored twice. Set this to false to keep the journal only.
+# /var/log/syslog then stops filling.
+logging_journald_forward_to_syslog: true

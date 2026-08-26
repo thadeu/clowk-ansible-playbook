@@ -1,0 +1,124 @@
+---
+# The cleanup runs before any apt task. get.docker.com, a manual install, or
+# an older run of this role leaves a second source for the same repository,
+# and apt then refuses to read ANY source list:
+#   E: Conflicting values set for option Signed-By regarding source
+#      https://download.docker.com/linux/debian/ trixie:
+#      /etc/apt/keyrings/docker.gpg != /etc/apt/keyrings/docker.asc
+# Every apt task in this role would fail until the extra source is gone.
+- name: Find the Docker apt sources that this role does not manage
+  ansible.builtin.find:
+    paths: /etc/apt/sources.list.d
+    patterns:
+      - "*.list"
+      - "*.sources"
+    contains: 'download\.docker\.com'
+    # find matches "contains" against the START of each line unless the whole
+    # file is read. Without this the pattern never matches a "deb [...] URL"
+    # line and the cleanup silently does nothing.
+    read_whole_file: true
+  register: docker_foreign_sources
+  when: docker_clean_conflicting_sources | bool
+
+- name: Remove the Docker apt sources that this role does not manage
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: >-
+    {{ (docker_foreign_sources.files | default([])) | map(attribute='path')
+       | reject('equalto', docker_sources_file) | list }}
+  register: docker_sources_cleaned
+  when: docker_clean_conflicting_sources | bool
+
+- name: Remove the keyring left by an older Docker install
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ docker_stale_keyrings | reject('equalto', docker_keyring) | list }}"
+  register: docker_old_keyring
+  when: docker_clean_conflicting_sources | bool
+
+- name: Install the Docker prerequisites
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+    update_cache: true
+    lock_timeout: 300
+
+- name: Create the apt keyring directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Add the Docker GPG key
+  ansible.builtin.get_url:
+    url: "https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg"
+    dest: "{{ docker_keyring }}"
+    owner: root
+    group: root
+    mode: "0644"
+  register: docker_key
+
+# Written from a template rather than with deb822_repository, which needs
+# python3-debian importable by whichever interpreter Ansible picked on the
+# target. A template is idempotent by content and has no such dependency.
+# apt_repository is not used because it is deprecated and writes the older
+# .list format that conflicts with the .sources file above.
+- name: Add the Docker apt repository
+  ansible.builtin.template:
+    src: docker.sources.j2
+    dest: "{{ docker_sources_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  register: docker_repo
+
+- name: Update the apt cache after a repository change
+  ansible.builtin.apt:
+    update_cache: true
+    lock_timeout: 300
+  when: docker_repo is changed or docker_key is changed
+
+- name: Install Docker Engine
+  ansible.builtin.apt:
+    name: "{{ docker_packages }}"
+    state: present
+    lock_timeout: 300
+
+- name: Create the Docker configuration directory
+  ansible.builtin.file:
+    path: /etc/docker
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Configure the Docker daemon
+  ansible.builtin.template:
+    src: daemon.json.j2
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart Docker
+
+- name: Start Docker on boot
+  ansible.builtin.service:
+    name: docker
+    enabled: true
+    state: started
+
+# The "docker" group only exists after the package install, so this task
+# has to come last.
+- name: Add the admin users to the docker group
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: docker
+    append: true
+  loop: "{{ docker_users }}"

@@ -1,0 +1,9 @@
+*.retry
+.vault_pass
+vault_pass.txt
+# Real hosts stay out of the repository. Track the example instead.
+inventory/hosts.ini
+inventory/*.local.ini
+group_vars/*.local.yml
+.venv/
+__pycache__/

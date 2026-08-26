@@ -1,0 +1,25 @@
+---
+timezone: UTC
+
+# Leave empty to keep the hostname that the cloud image sets.
+common_hostname: ""
+
+common_packages:
+  - sudo
+  - curl
+  - wget
+  - git
+  - vim
+  - htop
+  - unzip
+  - rsync
+  - ca-certificates
+  - gnupg
+  - lsb-release
+  - apt-transport-https
+  - python3-apt
+
+common_extra_packages: []
+
+common_unattended_upgrades: true
+common_apt_lock_timeout: 300

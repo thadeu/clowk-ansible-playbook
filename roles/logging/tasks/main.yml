@@ -1,0 +1,71 @@
+---
+- name: Install logrotate
+  ansible.builtin.apt:
+    name: logrotate
+    state: present
+    lock_timeout: 300
+
+# blockinfile keeps whatever else the distribution puts in this file.
+# The directives must come BEFORE "include /etc/logrotate.d", because
+# logrotate reads the file in order and only the directives seen before the
+# include act as defaults for the included configs.
+- name: Add a global size ceiling to logrotate
+  ansible.builtin.blockinfile:
+    path: /etc/logrotate.conf
+    marker: "# {mark} ANSIBLE MANAGED: size ceiling"
+    insertbefore: '^include\s'
+    block: |
+      # Rotate on size as well as on time. No config in /etc/logrotate.d sets
+      # maxsize, so this ceiling reaches all of them.
+      maxsize {{ logging_logrotate_maxsize }}
+      {% if logging_logrotate_compress %}
+      compress
+      delaycompress
+      notifempty
+      {% endif %}
+    create: false
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Create the journald drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# A drop-in leaves /etc/systemd/journald.conf, a package conffile,
+# untouched.
+- name: Cap the size of the journal
+  ansible.builtin.copy:
+    dest: /etc/systemd/journald.conf.d/00-ansible-size.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible, role: logging
+      # The compiled default is 10% of the filesystem, capped at 4G.
+      [Journal]
+      SystemMaxUse={{ logging_journald_max_use }}
+      SystemKeepFree={{ logging_journald_keep_free }}
+      SystemMaxFileSize={{ logging_journald_max_file_size }}
+      MaxRetentionSec={{ logging_journald_max_retention }}
+      ForwardToSyslog={{ 'yes' if logging_journald_forward_to_syslog | bool else 'no' }}
+  notify: Restart journald
+
+# Debian runs logrotate from a timer, not from cron. Guarded because a
+# container has no systemd, and the role still has to be testable there.
+- name: Run logrotate on a timer
+  ansible.builtin.service:
+    name: logrotate.timer
+    enabled: true
+    state: started
+  when: ansible_service_mgr == 'systemd'
+
+- name: Check the logrotate configuration
+  ansible.builtin.command: logrotate --debug /etc/logrotate.conf
+  register: logging_logrotate_check
+  changed_when: false
+  failed_when: logging_logrotate_check.rc != 0

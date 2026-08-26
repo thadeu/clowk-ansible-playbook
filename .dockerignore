@@ -1,0 +1,12 @@
+.git
+.github
+.venv
+venv
+README.md
+justfile
+.just
+tests
+*.retry
+.vault_pass
+vault_pass.txt
+__pycache__

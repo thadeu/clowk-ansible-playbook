@@ -1,0 +1,25 @@
+# {{ ansible_managed }}
+# Drop-in read by the "Include /etc/ssh/sshd_config.d/*.conf" line.
+# sshd keeps the first value that it finds for each keyword, and the
+# Include sits at the top of sshd_config, so these values win.
+
+Port {{ ssh_port }}
+
+PermitRootLogin {{ ssh_permit_root_login }}
+PubkeyAuthentication {{ ssh_pubkey_authentication }}
+PasswordAuthentication {{ ssh_password_authentication }}
+KbdInteractiveAuthentication {{ ssh_kbd_interactive_authentication }}
+PermitEmptyPasswords no
+
+MaxAuthTries {{ ssh_max_auth_tries }}
+LoginGraceTime {{ ssh_login_grace_time }}
+ClientAliveInterval {{ ssh_client_alive_interval }}
+ClientAliveCountMax {{ ssh_client_alive_count_max }}
+
+X11Forwarding {{ ssh_x11_forwarding }}
+AllowAgentForwarding no
+UseDNS no
+{% if ssh_allow_users | length > 0 %}
+
+AllowUsers {{ ssh_allow_users | join(' ') }}
+{% endif %}

@@ -1,0 +1,17 @@
+---
+ssh_port: 22
+
+firewall_default_incoming: deny
+firewall_default_outgoing: allow
+
+# Port {{ ssh_port }} is always open. Add the other TCP ports here.
+firewall_allowed_tcp_ports:
+  - 80
+  - 443
+
+firewall_allowed_udp_ports: []
+
+# "limit" drops a source IP after 6 connection attempts in 30 seconds.
+firewall_rate_limit_ssh: true
+
+firewall_logging: low

@@ -1,0 +1,16 @@
+---
+ssh_port: 22
+
+fail2ban_maxretry: 5
+fail2ban_findtime: 10m
+fail2ban_bantime: 1h
+
+# "ufw" writes the ban into the firewall that this playbook installs.
+fail2ban_banaction: ufw
+
+# Debian 12 and Ubuntu 22.04 send the sshd log to the journal only.
+fail2ban_backend: systemd
+
+fail2ban_ignoreip:
+  - 127.0.0.1/8
+  - ::1

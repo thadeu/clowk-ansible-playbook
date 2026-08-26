@@ -1,0 +1,18 @@
+---
+profile: basic
+
+exclude_paths:
+  - .venv/
+  - venv/
+  - .git/
+
+skip_list:
+  # Several variables are read by more than one role on purpose:
+  #   ssh_port     -> ssh, firewall, fail2ban
+  #   admin_users  -> users, docker
+  # A per-role prefix would hide that these are the same value.
+  - var-naming[no-role-prefix]
+
+warn_list:
+  # ansible-lint cannot compare a Jinja expression against a choice list.
+  - args[module]

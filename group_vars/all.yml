@@ -1,0 +1,38 @@
+---
+# ---------------------------------------------------------------------------
+# Values shared by more than one role.
+# Every other setting has a default in roles/<role>/defaults/main.yml.
+# Override any of them here.
+# ---------------------------------------------------------------------------
+
+# SSH public keys are read from THIS machine. Nothing to paste here.
+# A path that does not exist is skipped. Override only if your key lives
+# somewhere else.
+# admin_ssh_public_key_files:
+#   - ~/.ssh/id_ed25519.pub
+#   - ~/.ssh/id_rsa.pub
+
+# Extra keys written out in full, for a colleague or a CI key.
+# These are added to the keys found above.
+admin_ssh_public_keys: []
+
+# Login accounts with passwordless sudo and Docker access.
+admin_users:
+  - debian
+  - voodu
+
+# The port that sshd listens on. The firewall role and the fail2ban role
+# read the same value.
+ssh_port: 22
+
+# ---------------------------------------------------------------------------
+# Common examples of overrides
+# ---------------------------------------------------------------------------
+timezone: UTC
+
+swap_size: 2G
+
+# Extra TCP ports to open. Port {{ ssh_port }} is always open.
+firewall_allowed_tcp_ports:
+  - 80
+  - 443

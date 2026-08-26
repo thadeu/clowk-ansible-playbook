@@ -1,0 +1,39 @@
+---
+tools_enabled: true
+
+# Network and capture diagnostics.
+#   tcpdump    packet capture
+#   tshark     the Wireshark command line
+#   net-tools  netstat, ifconfig, route. "ss" from iproute2 is the modern
+#              equivalent and is already installed, but netstat is asked for
+#              by a lot of runbooks.
+#   sngrep     SIP capture and call flow
+tools_packages:
+  - tcpdump
+  - tshark
+  - net-tools
+  - sngrep
+
+tools_extra_packages: []
+
+# Debian asks whether a non-root user may capture packets. Ansible installs
+# with DEBIAN_FRONTEND=noninteractive, which answers "no" and keeps capture
+# for root only. Set this to true to let the "wireshark" group capture
+# without sudo. "sudo tcpdump" works either way, because the admin users
+# have passwordless sudo.
+tools_tshark_nonroot_capture: false
+tools_tshark_capture_users: "{{ admin_users | default([]) }}"
+
+tools_awscli: true
+
+# auto  = use apt when it offers version 2, else the official AWS installer.
+#         Debian 13 ships awscli 2.x. Debian 12 and older ship 1.x.
+# apt   = always use apt, even when that means version 1.
+# official = always use the installer from awscli.amazonaws.com.
+tools_awscli_method: auto
+
+# Only used by the official installer. Empty means the current release.
+tools_awscli_version: ""
+
+# true re-runs the official installer with --update on every play.
+tools_awscli_update: false

@@ -1,0 +1,17 @@
+---
+ssh_port: 22
+ssh_service_name: ssh
+
+ssh_permit_root_login: "no"
+ssh_password_authentication: "yes"
+ssh_kbd_interactive_authentication: "no"
+ssh_pubkey_authentication: "yes"
+ssh_x11_forwarding: "no"
+ssh_max_auth_tries: 3
+ssh_login_grace_time: 30
+ssh_client_alive_interval: 300
+ssh_client_alive_count_max: 2
+
+# Empty list = every account can log in.
+# Fill it to limit SSH to these accounts only.
+ssh_allow_users: []

@@ -1,0 +1,36 @@
+---
+- name: Install the debconf helpers
+  ansible.builtin.apt:
+    name: debconf-utils
+    state: present
+    lock_timeout: 300
+
+# The answer has to be set BEFORE the package is unpacked, otherwise the
+# default is used and only a reconfigure changes it.
+- name: Answer the tshark capture question in advance
+  ansible.builtin.debconf:
+    name: wireshark-common
+    question: wireshark-common/install-setuid
+    vtype: boolean
+    value: "{{ tools_tshark_nonroot_capture | bool | lower }}"
+  when: "'tshark' in tools_packages"
+
+- name: Install the diagnostic tools
+  ansible.builtin.apt:
+    name: "{{ tools_packages + tools_extra_packages }}"
+    state: present
+    lock_timeout: 300
+
+- name: Let the admin users capture packets without sudo
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: wireshark
+    append: true
+  loop: "{{ tools_tshark_capture_users }}"
+  when:
+    - tools_tshark_nonroot_capture | bool
+    - "'tshark' in tools_packages"
+
+- name: Install aws-cli
+  ansible.builtin.include_tasks: awscli.yml
+  when: tools_awscli | bool

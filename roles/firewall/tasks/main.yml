@@ -1,0 +1,47 @@
+---
+- name: Install UFW
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+
+# This rule comes first. UFW must never start with a closed SSH port.
+- name: Allow SSH
+  community.general.ufw:
+    rule: "{{ 'limit' if firewall_rate_limit_ssh | bool else 'allow' }}"
+    port: "{{ ssh_port }}"
+    proto: tcp
+    comment: SSH (managed by Ansible)
+
+- name: Allow the TCP ports
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+    comment: Managed by Ansible
+  loop: "{{ firewall_allowed_tcp_ports | reject('equalto', ssh_port | int) | list }}"
+
+- name: Allow the UDP ports
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: udp
+    comment: Managed by Ansible
+  loop: "{{ firewall_allowed_udp_ports }}"
+
+- name: Set the default incoming policy
+  community.general.ufw:
+    direction: incoming
+    policy: "{{ firewall_default_incoming }}"
+
+- name: Set the default outgoing policy
+  community.general.ufw:
+    direction: outgoing
+    policy: "{{ firewall_default_outgoing }}"
+
+- name: Set the firewall log level
+  community.general.ufw:
+    logging: "{{ firewall_logging }}"
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled

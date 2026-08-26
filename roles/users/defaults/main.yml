@@ -1,0 +1,23 @@
+---
+admin_users: []
+
+# Public key files read from the CONTROL NODE, not from the server.
+# A path that does not exist is skipped without an error.
+# In the container "~" is /root, and your ~/.ssh is mounted there, so the
+# same paths work with both runners.
+admin_ssh_public_key_files:
+  - ~/.ssh/id_ed25519.pub
+  - ~/.ssh/id_rsa.pub
+  - ~/.ssh/id_ecdsa.pub
+
+# Extra keys written out in full, for a colleague or a CI key.
+# These are added to the keys read from the files above.
+admin_ssh_public_keys: []
+
+admin_user_shell: /bin/bash
+admin_sudo_group: sudo
+admin_passwordless_sudo: true
+
+# true  = the collected keys become the only keys.
+# false = they are added to the keys that the cloud image installed.
+admin_ssh_keys_exclusive: false

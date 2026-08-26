@@ -1,0 +1,71 @@
+---
+- name: Read the public keys from the control node
+  ansible.builtin.set_fact:
+    admin_keys_from_files: >-
+      {{ (admin_keys_from_files | default([]))
+         + ([lookup('file', item, errors='ignore')] | select('truthy') | list) }}
+  loop: "{{ admin_ssh_public_key_files | map('expanduser') | list }}"
+  loop_control:
+    label: "{{ item }}"
+  run_once: true
+
+- name: Build the list of authorized keys
+  ansible.builtin.set_fact:
+    admin_authorized_keys: >-
+      {{ (admin_ssh_public_keys + (admin_keys_from_files | default([])))
+         | map('trim') | select('truthy') | unique | list }}
+
+- name: Report the keys that will be installed
+  ansible.builtin.debug:
+    msg: >-
+      {{ admin_authorized_keys | length }} key(s):
+      {{ admin_authorized_keys | map('regex_replace', '^(\S+)\s+(\S{0,12}).*$', '\1 \2...') | list }}
+  run_once: true
+
+- name: Check the admin configuration before any change
+  ansible.builtin.assert:
+    that:
+      - admin_users | length > 0
+      - admin_authorized_keys | length > 0
+      - admin_authorized_keys | reject('match', '^(ssh-ed25519|ssh-rsa|ecdsa-sha2-|sk-ssh-|sk-ecdsa-)') | list | length == 0
+    fail_msg: >-
+      No usable SSH public key was found, or admin_users is empty.
+      The role reads {{ admin_ssh_public_key_files | join(', ') }} from the
+      machine that runs Ansible. Generate one with
+      "ssh-keygen -t ed25519", point admin_ssh_public_key_files at another
+      path, or write the key out in admin_ssh_public_keys.
+    quiet: true
+
+- name: Make sure the sudo group exists
+  ansible.builtin.group:
+    name: "{{ admin_sudo_group }}"
+    state: present
+
+- name: Make sure the admin users exist
+  ansible.builtin.user:
+    name: "{{ item }}"
+    shell: "{{ admin_user_shell }}"
+    groups: "{{ admin_sudo_group }}"
+    append: true
+    create_home: true
+    state: present
+  loop: "{{ admin_users }}"
+
+- name: Give the admin users passwordless sudo
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/90-ansible-{{ item }}"
+    content: "{{ item }} ALL=(ALL) NOPASSWD:ALL\n"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: "/usr/sbin/visudo -cf %s"
+  loop: "{{ admin_users }}"
+  when: admin_passwordless_sudo | bool
+
+- name: Install the authorized SSH keys
+  ansible.posix.authorized_key:
+    user: "{{ item }}"
+    key: "{{ admin_authorized_keys | join('\n') }}"
+    exclusive: "{{ admin_ssh_keys_exclusive | bool }}"
+    state: present
+  loop: "{{ admin_users }}"
